@@ -211,7 +211,8 @@
                 
                 const time = document.createElement('div');
                 time.className = 'time-text';
-                time.textContent = log.date.toLocaleString();
+                // Changed from toLocaleString() to toLocaleDateString() to remove time
+                time.textContent = log.date.toLocaleDateString();
 
                 item.appendChild(title);
                 item.appendChild(time);
@@ -231,20 +232,18 @@
             for (const friendName in appData.friends) {
                 const friendData = appData.friends[friendName];
                 
-                // Sort logs chronologically to build the timeline accurately
                 const sortedLogs = [...friendData.logs].sort((a, b) => new Date(a) - new Date(b));
                 
                 const dataPoints = sortedLogs.map((dateStr, index) => {
                     return {
                         x: new Date(dateStr),
-                        y: index + 1 // Cumulative count at that specific date
+                        y: index + 1
                     };
                 });
 
-                // Add a starting point at zero if there are any logs, so the line originates properly
                 if (dataPoints.length > 0) {
                     const firstDate = new Date(dataPoints[0].x);
-                    firstDate.setHours(firstDate.getHours() - 1); // Anchor slightly before the first event
+                    firstDate.setHours(firstDate.getHours() - 1); 
                     dataPoints.unshift({ x: firstDate, y: 0 });
                 }
 
@@ -253,7 +252,7 @@
                     data: dataPoints,
                     borderColor: friendData.color,
                     backgroundColor: friendData.color,
-                    stepped: true, // Creates a sharp jump rather than a smooth curve
+                    stepped: true, 
                     borderWidth: 2,
                     pointRadius: 4,
                     pointHoverRadius: 6
@@ -264,7 +263,6 @@
                 myChart.destroy();
             }
 
-            // If there are no friends, clear the chart gracefully
             if (Object.keys(appData.friends).length === 0) {
                 return;
             }
@@ -280,7 +278,8 @@
                         x: {
                             type: 'time',
                             time: {
-                                tooltipFormat: 'PP p' // standard date-fns format
+                                unit: 'day', // Forces the axis to only show days
+                                tooltipFormat: 'PP' // Formats tooltip to show Date only (e.g., Apr 25, 2026)
                             },
                             title: {
                                 display: true,
