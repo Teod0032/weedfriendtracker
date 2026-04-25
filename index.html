@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The "I'm Quitting" Tracker</title>
+    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3498db">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -84,12 +88,12 @@
     </div>
 
     <div class="card">
-        <h3>Total Claims by Friend</h3>
-        <canvas id="quitChart" height="150"></canvas>
+        <h3>Timeline of Claims</h3>
+        <canvas id="quitChart" height="200"></canvas>
     </div>
 
     <div class="card">
-        <h3>Historical Timeline</h3>
+        <h3>Log History</h3>
         <div id="timeline"></div>
     </div>
 
@@ -146,12 +150,11 @@
             }
         }
 
-        // Update the visual timeline
+        // Update the visual text timeline
         function updateTimeline() {
             const timelineDiv = document.getElementById('timeline');
             timelineDiv.innerHTML = '';
 
-            // Flatten all logs into a single array and sort by newest first
             let allLogs = [];
             for (const friendName in appData.friends) {
                 const friendData = appData.friends[friendName];
@@ -159,9 +162,8 @@
                     allLogs.push({ name: friendName, date: new Date(dateString), color: friendData.color });
                 });
             }
-            allLogs.sort((a, b) => b.date - a.date); // Sort descending
+            allLogs.sort((a, b) => b.date - a.date); 
 
-            // Create DOM elements
             allLogs.forEach(log => {
                 const item = document.createElement('div');
                 item.className = 'timeline-item';
@@ -184,40 +186,77 @@
             }
         }
 
-        // Update the Bar Chart
+        // Update the Timeline Chart (X = Date, Y = Cumulative Count)
         function updateChart() {
             const ctx = document.getElementById('quitChart').getContext('2d');
-            
-            const labels = [];
-            const dataCounts = [];
-            const backgroundColors = [];
+            const datasets = [];
 
             for (const friendName in appData.friends) {
-                labels.push(friendName);
-                dataCounts.push(appData.friends[friendName].logs.length);
-                backgroundColors.push(appData.friends[friendName].color);
+                const friendData = appData.friends[friendName];
+                
+                // Sort logs chronologically to build the timeline accurately
+                const sortedLogs = [...friendData.logs].sort((a, b) => new Date(a) - new Date(b));
+                
+                const dataPoints = sortedLogs.map((dateStr, index) => {
+                    return {
+                        x: new Date(dateStr),
+                        y: index + 1 // Cumulative count at that specific date
+                    };
+                });
+
+                // Add a starting point at zero if there are any logs, so the line originates properly
+                if (dataPoints.length > 0) {
+                    const firstDate = new Date(dataPoints[0].x);
+                    firstDate.setHours(firstDate.getHours() - 1); // Anchor slightly before the first event
+                    dataPoints.unshift({ x: firstDate, y: 0 });
+                }
+
+                datasets.push({
+                    label: friendName,
+                    data: dataPoints,
+                    borderColor: friendData.color,
+                    backgroundColor: friendData.color,
+                    stepped: true, // Creates a sharp jump rather than a smooth curve
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                });
             }
 
             if (myChart) {
-                myChart.destroy(); // Destroy old chart before re-drawing
+                myChart.destroy();
             }
 
             myChart = new Chart(ctx, {
-                type: 'bar',
+                type: 'line',
                 data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Number of Times Quit',
-                        data: dataCounts,
-                        backgroundColor: backgroundColors,
-                        borderRadius: 6
-                    }]
+                    datasets: datasets
                 },
                 options: {
+                    responsive: true,
                     scales: {
-                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'PP p' // standard date-fns format
+                            },
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 },
+                            title: {
+                                display: true,
+                                text: 'Cumulative Times Quit'
+                            }
+                        }
                     },
-                    plugins: { legend: { display: false } }
+                    plugins: {
+                        legend: { display: true }
+                    }
                 }
             });
         }
@@ -229,16 +268,16 @@
             updateTimeline();
         }
 
-        // Initial load
-        refreshUI();
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(registration => console.log('ServiceWorker registered'))
                     .catch(err => console.log('ServiceWorker registration failed: ', err));
             });
         }
+
+        // Initial load
+        refreshUI();
     </script>
 </body>
 </html>
