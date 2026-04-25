@@ -55,6 +55,8 @@
             margin-top: 0.5rem;
         }
         .btn-log:hover { background-color: #219653; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
         #timeline { max-height: 300px; overflow-y: auto; padding-right: 1rem; }
         .timeline-item {
             padding: 0.75rem;
@@ -64,6 +66,7 @@
             border-radius: 0 6px 6px 0;
         }
         .time-text { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 1.5rem 0; }
     </style>
 </head>
 <body>
@@ -79,11 +82,21 @@
     </div>
 
     <div class="card">
-        <h3>Add a Friend</h3>
+        <h3>Manage Friends</h3>
+        
+        <div style="margin-bottom: 0.5rem;"><strong>Add New:</strong></div>
         <div class="form-group">
             <input type="text" id="newFriendName" placeholder="Friend's Name">
             <input type="color" id="newFriendColor" value="#e74c3c">
-            <button onclick="addFriend()">Add Friend</button>
+            <button onclick="addFriend()">Add</button>
+        </div>
+
+        <hr>
+
+        <div style="margin-bottom: 0.5rem;"><strong>Remove Existing:</strong></div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <select id="removeFriendSelect"></select>
+            <button class="btn-danger" onclick="removeFriend()">Remove</button>
         </div>
     </div>
 
@@ -127,6 +140,21 @@
             }
         }
 
+        // Remove an existing friend profile
+        function removeFriend() {
+            const select = document.getElementById('removeFriendSelect');
+            const nameToRemove = select.value;
+            
+            if (nameToRemove) {
+                const confirmed = confirm(`Are you sure you want to completely remove ${nameToRemove} and all their log history?`);
+                if (confirmed) {
+                    delete appData.friends[nameToRemove];
+                    saveData();
+                    refreshUI();
+                }
+            }
+        }
+
         // Log a new quit attempt
         function logEvent() {
             const selectedFriend = document.getElementById('friendSelect').value;
@@ -138,15 +166,24 @@
             }
         }
 
-        // Update the Dropdown
-        function updateDropdown() {
-            const select = document.getElementById('friendSelect');
-            select.innerHTML = '';
+        // Update all Dropdowns
+        function updateDropdowns() {
+            const logSelect = document.getElementById('friendSelect');
+            const removeSelect = document.getElementById('removeFriendSelect');
+            
+            logSelect.innerHTML = '';
+            removeSelect.innerHTML = '';
+            
             for (const friendName in appData.friends) {
-                const option = document.createElement('option');
-                option.value = friendName;
-                option.textContent = friendName;
-                select.appendChild(option);
+                const option1 = document.createElement('option');
+                option1.value = friendName;
+                option1.textContent = friendName;
+                logSelect.appendChild(option1);
+
+                const option2 = document.createElement('option');
+                option2.value = friendName;
+                option2.textContent = friendName;
+                removeSelect.appendChild(option2);
             }
         }
 
@@ -227,6 +264,11 @@
                 myChart.destroy();
             }
 
+            // If there are no friends, clear the chart gracefully
+            if (Object.keys(appData.friends).length === 0) {
+                return;
+            }
+
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -263,7 +305,7 @@
 
         // Refresh all UI elements
         function refreshUI() {
-            updateDropdown();
+            updateDropdowns();
             updateChart();
             updateTimeline();
         }
