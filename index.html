@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The "I'm Quitting" Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1 { text-align: center; color: #2c3e50; }
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+        }
+        .form-group { margin-bottom: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+        input[type="text"], select {
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            flex-grow: 1;
+        }
+        input[type="color"] { border: none; background: none; cursor: pointer; height: 35px; width: 35px; }
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #2980b9; }
+        .btn-log {
+            background-color: #27ae60;
+            width: 100%;
+            font-size: 1.2rem;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+        .btn-log:hover { background-color: #219653; }
+        #timeline { max-height: 300px; overflow-y: auto; padding-right: 1rem; }
+        .timeline-item {
+            padding: 0.75rem;
+            border-left: 4px solid;
+            background: #f9f9f9;
+            margin-bottom: 0.5rem;
+            border-radius: 0 6px 6px 0;
+        }
+        .time-text { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
+    </style>
+</head>
+<body>
+
+    <h1>🚭 The "I'm Quitting" Tracker</h1>
+
+    <div class="card">
+        <h3>Log an Announcement</h3>
+        <div class="form-group">
+            <select id="friendSelect"></select>
+        </div>
+        <button class="btn-log" onclick="logEvent()">"I'm quitting tomorrow bro"</button>
+    </div>
+
+    <div class="card">
+        <h3>Add a Friend</h3>
+        <div class="form-group">
+            <input type="text" id="newFriendName" placeholder="Friend's Name">
+            <input type="color" id="newFriendColor" value="#e74c3c">
+            <button onclick="addFriend()">Add Friend</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Total Claims by Friend</h3>
+        <canvas id="quitChart" height="150"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>Historical Timeline</h3>
+        <div id="timeline"></div>
+    </div>
+
+    <script>
+        // Initialize Data from LocalStorage or set defaults
+        let appData = JSON.parse(localStorage.getItem('quitTrackerData')) || {
+            friends: {
+                "John Doe": { color: "#e74c3c", logs: [] }
+            }
+        };
+
+        let myChart = null;
+
+        // Save data to LocalStorage
+        function saveData() {
+            localStorage.setItem('quitTrackerData', JSON.stringify(appData));
+        }
+
+        // Add a new friend profile
+        function addFriend() {
+            const name = document.getElementById('newFriendName').value.trim();
+            const color = document.getElementById('newFriendColor').value;
+            
+            if (name && !appData.friends[name]) {
+                appData.friends[name] = { color: color, logs: [] };
+                saveData();
+                document.getElementById('newFriendName').value = '';
+                refreshUI();
+            } else if (appData.friends[name]) {
+                alert("Friend already exists!");
+            }
+        }
+
+        // Log a new quit attempt
+        function logEvent() {
+            const selectedFriend = document.getElementById('friendSelect').value;
+            if (selectedFriend) {
+                const now = new Date();
+                appData.friends[selectedFriend].logs.push(now.toISOString());
+                saveData();
+                refreshUI();
+            }
+        }
+
+        // Update the Dropdown
+        function updateDropdown() {
+            const select = document.getElementById('friendSelect');
+            select.innerHTML = '';
+            for (const friendName in appData.friends) {
+                const option = document.createElement('option');
+                option.value = friendName;
+                option.textContent = friendName;
+                select.appendChild(option);
+            }
+        }
+
+        // Update the visual timeline
+        function updateTimeline() {
+            const timelineDiv = document.getElementById('timeline');
+            timelineDiv.innerHTML = '';
+
+            // Flatten all logs into a single array and sort by newest first
+            let allLogs = [];
+            for (const friendName in appData.friends) {
+                const friendData = appData.friends[friendName];
+                friendData.logs.forEach(dateString => {
+                    allLogs.push({ name: friendName, date: new Date(dateString), color: friendData.color });
+                });
+            }
+            allLogs.sort((a, b) => b.date - a.date); // Sort descending
+
+            // Create DOM elements
+            allLogs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'timeline-item';
+                item.style.borderLeftColor = log.color;
+                
+                const title = document.createElement('div');
+                title.innerHTML = `<strong>${log.name}</strong> said they are quitting.`;
+                
+                const time = document.createElement('div');
+                time.className = 'time-text';
+                time.textContent = log.date.toLocaleString();
+
+                item.appendChild(title);
+                item.appendChild(time);
+                timelineDiv.appendChild(item);
+            });
+
+            if (allLogs.length === 0) {
+                timelineDiv.innerHTML = "<p style='color: #888;'>No events logged yet.</p>";
+            }
+        }
+
+        // Update the Bar Chart
+        function updateChart() {
+            const ctx = document.getElementById('quitChart').getContext('2d');
+            
+            const labels = [];
+            const dataCounts = [];
+            const backgroundColors = [];
+
+            for (const friendName in appData.friends) {
+                labels.push(friendName);
+                dataCounts.push(appData.friends[friendName].logs.length);
+                backgroundColors.push(appData.friends[friendName].color);
+            }
+
+            if (myChart) {
+                myChart.destroy(); // Destroy old chart before re-drawing
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Number of Times Quit',
+                        data: dataCounts,
+                        backgroundColor: backgroundColors,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Refresh all UI elements
+        function refreshUI() {
+            updateDropdown();
+            updateChart();
+            updateTimeline();
+        }
+
+        // Initial load
+        refreshUI();
+    </script>
+</body>
+</html>
